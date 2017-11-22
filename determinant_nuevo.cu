@@ -31,13 +31,15 @@ int* d_arreglo_A;
 int* d_arreglo_B;
 int* d_arreglo_C;
 
+int* arreglo_determinantes;
+int* d_arreglo_determinantes;
 
 
 void printi(int i){
 	printf("%d\n", i);
 }
 
-void init_CPU_array(int* arreglo_b, int n){
+void init_CPU_matrices_array(int* arreglo_b, int n){
 	for(int i=0; i< N; i++)
 	{
 		arreglo_b[(i*16) + 0] = 1;
@@ -59,7 +61,11 @@ void init_CPU_array(int* arreglo_b, int n){
 	}
 
 }
-
+void init_CPU_array(int* array, int n){
+	for(int i = 0; i < n; i++) {
+		array[i] = i;
+	}
+}
 void print_CPU_array(int array[], int n){
 	for(int i = 0; i < n; i++) {
 		printi(array[i]);
@@ -189,6 +195,26 @@ __global__ void sumador_2(int* arreglo, int offset, int N){
 }
 
 
+// suma las determinantes de forma paralela y sin divergencia
+__global__ void sumador_3(int* arreglo, int acceso, int offset, int i, float N){
+
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	// if(tid < N/acceso)
+	// {
+	// 	printf("%d\n", arreglo[tid * acceso]);
+	// 	printf("%d\n", arreglo[tid * acceso + offset]);
+	// }
+	
+	if(tid < N/acceso)
+	{
+			arreglo[tid * acceso] = arreglo[tid * acceso] + arreglo[tid * acceso + offset];
+			arreglo[tid * acceso + offset] = 0; //solo para debugear
+			printf("%s\n", "TRABAJO");
+
+	}
+}
+
+
 void multiplicar(double num, int* mat, double mat_res[16])
 {
 	for(int i=0; i< 16; i++)
@@ -197,20 +223,66 @@ void multiplicar(double num, int* mat, double mat_res[16])
 	}
 }
 
+
+
+
+
 int main(int argc, char** argv){
 	int numBytes = sizeof(int) * N; //bytes a alocar
+	int numBytesDeterminantes = sizeof(int) * N; //bytes a alocar
 	int num = sizeof(int)*16;
 
 	suma_det = (int *) malloc(sizeof(int)); 
 	arreglo_A = (int *) malloc(numBytes);
 	arreglo_B = (int *) malloc(numBytes * 16);
 	arreglo_C = (int *) malloc(num);
-	
+
+
+	arreglo_determinantes = (int*) malloc(numBytesDeterminantes);
+	cudaMalloc(&d_arreglo_determinantes, numBytesDeterminantes);
+
+	init_CPU_array(arreglo_determinantes, N);
+	cudaMemcpy(d_arreglo_determinantes, arreglo_determinantes, numBytesDeterminantes, cudaMemcpyHostToDevice);
+
+	dim3 miGrid1D_suma_determinantes(1,1);
+	dim3 miBloque1D_suma_determinantes(N,1);
+
+
+	for(int i=1; pow(2,i-1) < N; i++)
+	{
+		sumador_3<<<miGrid1D_suma_determinantes, 
+								miBloque1D_suma_determinantes>>>(d_arreglo_determinantes, pow(2,i), pow(2, i-1), i, N);
+		cudaThreadSynchronize();
+		
+		printf("%s\n", " ");
+
+	}
+
+	cudaMemcpy(arreglo_determinantes, d_arreglo_determinantes, numBytesDeterminantes, cudaMemcpyDeviceToHost);
+
+	printf("%s\n", "SUMA DETERMINANTES RESULT:");
+	print_CPU_array(arreglo_determinantes, N);
+
+
+	float promedio_determinantes = (float)arreglo_determinantes[0] / N;
+
+	printf("%s\n", "PROMEDIO DETERMINANTES:");
+	printf("%f\n", promedio_determinantes);
+
+
+
+
+
+
+
+
+
+
 	//double timetick;
 
 	// llenamos los arreglos
 
-	init_CPU_array(arreglo_B, N);
+	init_CPU_matrices_array(arreglo_B, N);
 
 
 	// allocamos memoria en la gpu
@@ -266,24 +338,28 @@ int main(int argc, char** argv){
 	multiplicar(promedio_det, arreglo_C, mat_res);
 
 	//imprimimos los resultados
-	printf("%s\n", "");
-	printf("%s\n", "Promedio determinante:");
+	// printf("%s\n", "");
+	// printf("%s\n", "Promedio determinante:");
 
-	printf("%lf\n", promedio_det);
-
-	
-
-	printf("%s\n", "MATRIZ RESULTANTE: ");
-	print_CPU_array_double(mat_res, 16);
-
-
+	// printf("%lf\n", promedio_det);
 
 	
+
+	// printf("%s\n", "MATRIZ RESULTANTE: ");
+	// print_CPU_array_double(mat_res, 16);
+
+
+
+	free(arreglo_determinantes);
+	cudaFree (d_arreglo_determinantes);
 	
+	free(arreglo_A);
 	free(arreglo_B);
 	free(arreglo_C);
+	free(suma_det);
 	
 
+	cudaFree (d_arreglo_A);
 	cudaFree (d_arreglo_B);
 	cudaFree (d_arreglo_C);
 

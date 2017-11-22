@@ -1,9 +1,9 @@
 #include "stdio.h"
 #include <math.h>
 
-int n = 12;
-int N = 12;
-int array[12];
+int n = 10;
+int N = 10;
+int array[10];
 
 void init_CPU_array(int array[], int n){
 	for(int i = 0; i < n; i++) {
@@ -15,19 +15,17 @@ void init_CPU_array(int array[], int n){
 void kernel_GPU(int acceso, int offset, int array[],int i)
 {
 	printf("%d\n", n);	
-	for(int id=0; id< 12; id++)
+	for(int id=0; id< 10; id++)
 	{
-		
 		if(id < N/pow(2, i))
 		{
-			
+			printf("%s\n", "TRABAJO");
+
 			array[id * acceso] = array[id * acceso] + array[id * acceso + offset];
-
-			
 		}
-
 	}
 }
+
 int main(int argc, char** argv){
 
 	init_CPU_array(array, n);
