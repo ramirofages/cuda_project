@@ -184,12 +184,18 @@ __global__ void sumador(int* arreglo, int offset, int N){
 __global__ void sumador_2(int* arreglo, int offset, int N){
 
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	shared int[10] compartido;
+	compartido[threadIdx.x] = arreglo1[tid];
+	groupSynchronize();
 
-	if(tid < N*16){
+	for(int i=1; i< 32/16; i*=2)
+	{
+		if(tid < N*16){
 
-		if( (( (tid / 16) & (offset*2)-1 ) == 0) && ( (tid+offset*16) < N*16))
-		{
-			arreglo[tid] = arreglo[tid] + arreglo[tid + offset * 16];
+			if( (( (tid / 16) & (offset*2)-1 ) == 0) && ( (tid+offset*16) < N*16))
+			{
+				arreglo[tid] = arreglo[tid] + arreglo[tid + offset * 16];
+			}
 		}
 	}
 }
@@ -214,6 +220,34 @@ __global__ void sumador_3(int* arreglo, int acceso, int offset, int i, float N){
 	}
 }
 
+// sumador sin optimizar :C
+__global__ void sumador_4(int* arreglo1, int* arreglo2, int offset, int N, int threads_per_block){
+
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	shared int[10] compartido;
+	compartido[threadIdx.x] = arreglo1[tid];
+	groupSynchronize();
+	if(blockIdx.x < N/threads_per_block)
+	{
+		for(int i=1; i< 10; i*=2)
+		{
+		
+
+				if( (threadIdx.x & ( (i * 2) -1)) == 0 && ( (threadIdx.x+i) < N))
+				{
+
+					compartido[threadIdx.x] = compartido[threadIdx.x] + compartido[threadIdx.x + ia];
+
+				}
+
+
+			}
+	}
+
+	arreglo2[blockIdx.x] = compartido[0];
+
+
+}
 
 void multiplicar(double num, int* mat, double mat_res[16])
 {
@@ -348,6 +382,29 @@ int main(int argc, char** argv){
 	// printf("%s\n", "MATRIZ RESULTANTE: ");
 	// print_CPU_array_double(mat_res, 16);
 
+	
+	// Sumamos todos los elementos para el promedio, el resultado queda almacenado en la primer posicion
+
+
+
+
+
+
+
+
+
+	int txb=10;
+
+	dim3 miGrid1D_suma_4(2,1);
+	dim3 miBloque1D_suma_4(txb,1);
+	for(int i=1; i <= cant_elem/txb; i*= 2){
+		sumador_4<<<miGrid1D_suma_4, miBloque1D_suma_4>>>(d_arreglo_suma1, d_arreglo_suma2, i, cant_elem, txb);
+		cudaThreadSynchronize();
+
+		int* temp = d_arreglo_suma1;
+		d_arreglo_suma1 = d_arreglo_suma2;
+		d_arreglo_suma2 = tmp;
+	}
 
 
 	free(arreglo_determinantes);
