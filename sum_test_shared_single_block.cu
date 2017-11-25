@@ -33,16 +33,16 @@ __global__ void sumador(int* arreglo, int* result, float N)
 	{
 		int acceso = pow((float)2,(float)i);
 		int offset = pow((float)2, (float)i-1);
-		if(threadIdx.x < (N/acceso))
+		if(threadIdx.x < (N/acceso) && (threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
 		{
 				compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
 				compartida[threadIdx.x * acceso + offset] = 0;
-				// printf("%s\n", "TRABAJO");
+				printf("%s\n", "TRABAJO");
 				result[blockIdx.x] = compartida[0];
 
 		}
 
-		// printf("%s\n", "");
+		printf("%s\n", "");
 		
 	}
 
@@ -59,7 +59,7 @@ int* arreglo_result;
 int* d_arreglo_suma2;
 
 int main(int argc, char** argv){
-	int N = 17;
+	int N = 8;
 
 	//##################################################################################
 	//############################## INICIALIZACION ####################################
@@ -82,7 +82,7 @@ int main(int argc, char** argv){
 
 	dim3 miGrid1D_1(block_count,1);
 	dim3 miBloque1D_1(threads_per_block,1);
-	sumador<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, threads_per_block);
+	sumador<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, N);
 
 
 	//###################################################################################
