@@ -35,18 +35,17 @@ __global__ void sumador(int* arreglo, int* result, float N)
 	{
 		int acceso = pow((float)2,(float)i);
 		int offset = pow((float)2, (float)i-1);
-		if(threadIdx.x < (10.0/acceso))
+		if(threadIdx.x < (10.0/acceso) && (threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
 		{
-				if((threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
-				{
-					compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
-					compartida[threadIdx.x * acceso + offset] = 0;
-				}
-
-				result[blockIdx.x] = compartida[0];
+				compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
+				compartida[threadIdx.x * acceso + offset] = 0;
 		}
 
 	}
+
+	//el primer thread de cada grupo guarda el resultado
+	if(threadIdx.x == 0)
+		result[blockIdx.x] = compartida[0];
 
 }
 
@@ -94,8 +93,7 @@ int main(int argc, char** argv){
 		d_arreglo_suma1 = d_arreglo_suma2;
 		d_arreglo_suma2 = tmp;
 
-		printf("%s\n", " ");
-		printf("index: %d \n ", remaining_elements);
+		printf("elementos restantes: %d \n ", remaining_elements);
 
 
 	}
@@ -106,7 +104,7 @@ int main(int argc, char** argv){
 	cudaMemcpy(arreglo_result, d_arreglo_suma1, N * sizeof(int), cudaMemcpyDeviceToHost);
 
 	printf("%s\n", "RESULTADO DE LA SUMA:");
-	print_CPU_array(arreglo_result, 15);
+	print_CPU_array(arreglo_result, 1);
 
 	free(arreglo_suma1);
 	cudaFree (d_arreglo_suma1);
