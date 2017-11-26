@@ -19,6 +19,14 @@ void print_CPU_array(int array[], int n){
 		printi(array[i]);
 	}
 }
+void print_CPU_matrix(int array[], int n){
+    for(int i = 0; i < n; i++) {
+        if(i % 16 == 0)
+            printf("%s\n", "");
+
+        printf("%d ", array[i]);
+    }
+}
 
 
 // realiza la suma de determinantes
@@ -91,7 +99,7 @@ int main(int argc, char** argv){
 	cudaMemcpy(arreglo_result, d_arreglo_suma2, N * sizeof(int), cudaMemcpyDeviceToHost);
 
 	printf("%s\n", "RESULTADO DE LA SUMA:");
-	print_CPU_array(arreglo_result, N);
+	print_CPU_matrix(arreglo_result, N);
 
 	free(arreglo_suma1);
 	cudaFree (d_arreglo_suma1);

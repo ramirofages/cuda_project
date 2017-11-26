@@ -40,64 +40,56 @@ void print_CPU_array(int array[], int n){
 	}
 }
 
+void print_CPU_matrix(int array[], int n){
+    for(int i = 0; i < n; i++) {
+        if(i % 16 == 0)
+            printf("%s\n", "");
 
-// realiza la suma de determinantes
+        printf("%d ", array[i]);
+    }
+}
+
+
 __global__ void sumador(int* arreglo, int* result, float N)
 {
 	__shared__ int compartida[threads_per_block * 16];
 
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-	compartida[threadIdx.x] = arreglo[tid];
-	printf("RESULT: %d, THREAD ID: %d\n", compartida[threadIdx.x], threadIdx.x);
+	if(tid > N * 16)
+		return;
 
+	compartida[threadIdx.x] = arreglo[tid];
 	__syncthreads();
-	for(int i=1; pow((float)2,(float)i-1) < 10 * 16; i++)
+	for(int i=1; pow((float)2,(float)i-1) < N; i++)
 	{
 		int acceso = pow((float)2,(float)i);
-		int offset = pow((float)2, (float)i-1) * 16;
-		if(threadIdx.x < ((10.0)/acceso) && (threadIdx.x * acceso + offset) < (N * 16- blockIdx.x * blockDim.x ))
-		{
-				compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
-				// compartida[threadIdx.x * acceso + offset * 16] = 0;
+		int offset = pow((float)2, (float)i-1);
 
+		int t_id = (threadIdx.x/16) * 16;
+		int new_access = t_id * acceso + threadIdx.x % 16 ;
+		int new_offset = t_id * acceso + offset * 16;
+
+		if(threadIdx.x < (160.0/acceso) && (new_offset) < (N*16 - blockIdx.x * blockDim.x))
+		{
+				
+
+				compartida[new_access] = compartida[new_access] + compartida[new_offset];
+				compartida[new_offset] = 0;
+				printf("TRABAJO ITERACION: %d - TID %d - ACCESO: %d - OFFSET %d - RESULTADO: %d \n", 
+																		i, 			tid, 	t_id * acceso + threadIdx.x % 16 , t_id * acceso + offset * 16, compartida[t_id * acceso ]);
 		}
+		__syncthreads();
 
 
 	}
 
 	//el primer thread de cada grupo guarda el resultado
 	if(threadIdx.x < 16)
-		result[blockIdx.x] = compartida[blockIdx.x];
+		result[blockIdx.x * 16 + threadIdx.x] = compartida[threadIdx.x];
 
 }
-//realiza la suma de n matrices
-__global__ void sumador_2(int* arreglo, int* result, float N){
 
-	int tid = blockIdx.x * blockDim.x + threadIdx.x;
-	// shared int[10 * 16] compartido;
-	// compartido[threadIdx.x] = arreglo[tid];
-	// __syncthreads();
-
-	// if(tid < N*16)
-	// {
-	// 		if( (( (tid / 16) & (offset*2)-1 ) == 0) && ( (tid+offset*16) < N*16))
-	// 		{
-	// 			arreglo[tid] = arreglo[tid] + arreglo[tid + offset * 16];
-	// 		}
-	// }
-
-	for(int i=1; pow((float)2,(float)i-1) < N; i++)
-	{
-		int acceso = pow((float)2,(float)i);
-		int offset = pow((float)2, (float)i-1) ;
-		if( (( (tid / 16) & (offset*2)-1 ) == 0) && ( (tid+offset*16) < N*16))
-		{
-				arreglo[tid] = arreglo[tid] + arreglo[tid + offset * 16];
-				printf("TRABAJAMOS TID:%d - SUMA:%d + %d \n", tid, threadIdx.x, threadIdx.x + offset * 16);
-		}
-	}
-}
 
 
 
@@ -110,7 +102,7 @@ int* d_arreglo_suma2;
 
 int main(int argc, char** argv){
 
-	int N = 4;
+	int N = 10;
 	//##################################################################################
 	//############################## INICIALIZACION ####################################
 	int byte_size = N * sizeof(int) * 16;
@@ -130,15 +122,15 @@ int main(int argc, char** argv){
 
 	dim3 miBloque1D_1(threads_per_block * 16,1);
 	dim3 miGrid1D_1(1,1);
-	sumador_2<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, N);
+	sumador<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, N);
 
 	//##################################################################################
 	//################################### READ BACK #####################################
 
-	cudaMemcpy(arreglo_result, d_arreglo_suma1, N * sizeof(int) * 16, cudaMemcpyDeviceToHost);
+	cudaMemcpy(arreglo_result, d_arreglo_suma2, N * sizeof(int) * 16, cudaMemcpyDeviceToHost);
 
 	printf("%s\n", "RESULTADO DE LA SUMA:");
-	print_CPU_array(arreglo_result, 32);
+	print_CPU_matrix(arreglo_result, N * 16);
 
 	free(arreglo_suma1);
 	cudaFree (d_arreglo_suma1);
