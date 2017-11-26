@@ -42,17 +42,10 @@ __global__ void sumador(int* arreglo, int* result, float N)
 					compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
 					compartida[threadIdx.x * acceso + offset] = 0;
 				}
-				
-				// printf("%s %d\n", "TRABAJA id:", threadIdx.x);
-				// printf("%s %d\n", "OFFSET:", threadIdx.x * acceso + offset);
-				// printf("%s %d\n", "result:", compartida[threadIdx.x * acceso]);
-				result[blockIdx.x] = compartida[0];
 
+				result[blockIdx.x] = compartida[0];
 		}
 
-		// printf("%s\n", "");
-
-		
 	}
 
 }
