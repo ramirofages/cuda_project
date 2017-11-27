@@ -176,7 +176,7 @@ __global__ void determinanteador(int* arreglo_b, int* arreglo_a, int N){
 
 int main(int argc, char** argv){
 
-	int N = 3;
+	int N = 520;
 	int threads_per_block_determinanteador = 512;
 
 
