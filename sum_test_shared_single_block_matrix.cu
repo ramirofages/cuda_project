@@ -70,7 +70,7 @@ __global__ void sumador(int* arreglo, int* result, float N)
 		int new_access = t_id * acceso + threadIdx.x % 16 ;
 		int new_offset = t_id * acceso + offset * 16;
 
-		if(threadIdx.x < (160.0/acceso) && (new_offset) < (N*16 - blockIdx.x * blockDim.x))
+		if(t_id < (160.0/acceso) && (new_offset) < (N*16 - blockIdx.x * blockDim.x))
 		{
 				
 

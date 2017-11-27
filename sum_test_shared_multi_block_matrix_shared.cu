@@ -13,22 +13,23 @@ void printi(int i){
 void init_CPU_array(int* arreglo_b, int n){
 	for(int i=0; i< n; i++)
 	{
-		arreglo_b[(i*16) + 0] = 1;
-		arreglo_b[(i*16) + 1] = 1;
-		arreglo_b[(i*16) + 2] = 1;
-		arreglo_b[(i*16) + 3] = 1;
-		arreglo_b[(i*16) + 4] = 1;
-		arreglo_b[(i*16) + 5] = 1;
-		arreglo_b[(i*16) + 6] = 1;
-		arreglo_b[(i*16) + 7] = 1;
-		arreglo_b[(i*16) + 8] = 1;
-		arreglo_b[(i*16) + 9] = 1;
-		arreglo_b[(i*16) + 10] = 1;
-		arreglo_b[(i*16) + 11] = 1;
-		arreglo_b[(i*16) + 12] = 1;
-		arreglo_b[(i*16) + 13] = 1;
-		arreglo_b[(i*16) + 14] = 1;
-		arreglo_b[(i*16) + 15] = 1;
+		int valor = 1;
+		arreglo_b[(i*16) + 0] = valor;
+		arreglo_b[(i*16) + 1] = valor;
+		arreglo_b[(i*16) + 2] = valor;
+		arreglo_b[(i*16) + 3] = valor;
+		arreglo_b[(i*16) + 4] = valor;
+		arreglo_b[(i*16) + 5] = valor;
+		arreglo_b[(i*16) + 6] = valor;
+		arreglo_b[(i*16) + 7] = valor;
+		arreglo_b[(i*16) + 8] = valor;
+		arreglo_b[(i*16) + 9] = valor;
+		arreglo_b[(i*16) + 10] = valor;
+		arreglo_b[(i*16) + 11] = valor;
+		arreglo_b[(i*16) + 12] = valor;
+		arreglo_b[(i*16) + 13] = valor;
+		arreglo_b[(i*16) + 14] = valor;
+		arreglo_b[(i*16) + 15] = valor;
 
 	}
 
@@ -40,64 +41,56 @@ void print_CPU_array(int array[], int n){
 	}
 }
 
+void print_CPU_matrix(int array[], int n){
+    for(int i = 0; i < n; i++) {
+        if(i % 16 == 0)
+            printf("%s\n", "");
 
-// realiza la suma de determinantes
+        printf("%d ", array[i]);
+    }
+}
+
+
 __global__ void sumador(int* arreglo, int* result, float N)
 {
 	__shared__ int compartida[threads_per_block * 16];
 
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-	compartida[threadIdx.x] = arreglo[tid];
-	printf("RESULT: %d, THREAD ID: %d\n", compartida[threadIdx.x], threadIdx.x);
+	if(tid > N * 16)
+		return;
 
+	compartida[threadIdx.x] = arreglo[tid];
 	__syncthreads();
-	for(int i=1; pow((float)2,(float)i-1) < 10 * 16; i++)
+	for(int i=1; pow((float)2,(float)i-1) < N; i++)
 	{
 		int acceso = pow((float)2,(float)i);
-		int offset = pow((float)2, (float)i-1) * 16;
-		if(threadIdx.x < ((10.0)/acceso) && (threadIdx.x * acceso + offset) < (N * 16- blockIdx.x * blockDim.x ))
-		{
-				compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
-				// compartida[threadIdx.x * acceso + offset * 16] = 0;
+		int offset = pow((float)2, (float)i-1);
 
+		int t_id = (threadIdx.x/16) * 16;
+		int new_access = t_id * acceso + threadIdx.x % 16 ;
+		int new_offset = new_access + offset * 16;
+
+		if(t_id < (160.0/acceso) && (new_offset  < (160)))
+		{
+				
+
+				compartida[new_access] = compartida[new_access] + compartida[new_offset];
+				compartida[new_offset] = 0;
+				printf("GRUPO: %d - ITERACION: %d - TID %d - ACCESO: %d - OFFSET %d - REMAINING: %d \n", blockIdx.x,
+																		i, 			tid, 	new_access , new_offset, threadIdx.x * acceso + offset);
 		}
+		__syncthreads();
 
 
 	}
 
 	//el primer thread de cada grupo guarda el resultado
 	if(threadIdx.x < 16)
-		result[blockIdx.x] = compartida[blockIdx.x];
+		result[blockIdx.x * 16 + threadIdx.x] = compartida[threadIdx.x];
 
 }
-//realiza la suma de n matrices
-__global__ void sumador_2(int* arreglo, int* result, float N){
 
-	__shared__ int compartido[threads_per_block * 16];
-	int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-	compartido[threadIdx.x] = arreglo[tid];
-	__syncthreads();
-
-
-	for(int i=1; pow((float)2,(float)i-1) < N; i++)
-	{
-		int acceso = pow((float)2,(float)i);
-		int offset = pow((float)2, (float)i-1) ;
-		if( (( (threadIdx.x / 16) & (offset*2)-1 ) == 0) && ( (threadIdx.x+offset*16) < N*16))
-		{
-				compartido[threadIdx.x] = compartido[threadIdx.x] + compartido[threadIdx.x + offset * 16];
-				printf("TRABAJAMOS TID:%d - SUMA:%d + %d \n", threadIdx.x, threadIdx.x, threadIdx.x + offset * 16);
-		}
-	}
-	__syncthreads();
-
-	if(threadIdx.x < 16)
-	{
-		result[threadIdx.x] = compartido[threadIdx.x];
-	}
-}
 
 
 
@@ -110,7 +103,7 @@ int* d_arreglo_suma2;
 
 int main(int argc, char** argv){
 
-	int N = 4;
+	int N = 15;
 	//##################################################################################
 	//############################## INICIALIZACION ####################################
 	int byte_size = N * sizeof(int) * 16;
@@ -128,17 +121,22 @@ int main(int argc, char** argv){
 	//##################################################################################
 	//################################ EJECUCIONES #####################################
 
+
 	dim3 miBloque1D_1(threads_per_block * 16,1);
-	dim3 miGrid1D_1(1,1);
-	sumador_2<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, N);
+	dim3 miGrid1D_1(2,1);
+	sumador<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, N);
+
+	dim3 miGrid1D_2(1,1);
+	sumador<<<miGrid1D_2, miBloque1D_1>>>(d_arreglo_suma2, d_arreglo_suma1, 2);
+
 
 	//##################################################################################
 	//################################### READ BACK #####################################
 
-	cudaMemcpy(arreglo_result, d_arreglo_suma2, N * sizeof(int) * 16, cudaMemcpyDeviceToHost);
+	cudaMemcpy(arreglo_result, d_arreglo_suma1, N * sizeof(int) * 16, cudaMemcpyDeviceToHost);
 
 	printf("%s\n", "RESULTADO DE LA SUMA:");
-	print_CPU_array(arreglo_result, 16);
+	print_CPU_matrix(arreglo_result, N * 16);
 
 	free(arreglo_suma1);
 	cudaFree (d_arreglo_suma1);
