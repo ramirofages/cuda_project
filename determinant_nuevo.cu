@@ -1,6 +1,8 @@
 #include "cuda.h"
 #include "stdio.h"
 
+#define threads_per_block 10
+
 
 //#include <sys/time.h>
 //#include <sys/resource.h>
@@ -171,12 +173,37 @@ __global__ void determinanteador(int* arreglo_b, int* arreglo_a, int N){
 	
 }
 
+// realiza la suma de determinantes
+__global__ void sumador_determinantes(int* arreglo, int* result, float N)
+{
+	__shared__ int compartida[threads_per_block];
 
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+	compartida[threadIdx.x] = arreglo[tid];
+	__syncthreads();
+	for(int i=1; pow((float)2,(float)i-1) < 10; i++)
+	{
+		int acceso = pow((float)2,(float)i);
+		int offset = pow((float)2, (float)i-1);
+		if(threadIdx.x < (10.0/acceso) && (threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
+		{
+				compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
+				compartida[threadIdx.x * acceso + offset] = 0;
+		}
+
+	}
+
+	//el primer thread de cada grupo guarda el resultado
+	if(threadIdx.x == 0)
+		result[blockIdx.x] = compartida[0];
+
+}
 
 
 int main(int argc, char** argv){
 
-	int N = 520;
+	int N = 3;
 	int threads_per_block_determinanteador = 512;
 
 
@@ -213,19 +240,36 @@ int main(int argc, char** argv){
 
 
 	//################################ DETERMINANTE ####################################
-	dim3 miGrid1D_suma_determinantes(ceil((float)N/threads_per_block_determinanteador),1);
-	dim3 miBloque1D_suma_determinantes(threads_per_block_determinanteador,1);
+	dim3 miGrid1D_determinanteador(ceil((float)N/threads_per_block_determinanteador),1);
+	dim3 miBloque1D_determinanteador(threads_per_block_determinanteador,1);
 
-	determinanteador<<<miGrid1D_suma_determinantes,miBloque1D_suma_determinantes>>>(d_mat_A, d_arreglo_determinantes, N);
+	determinanteador<<<miGrid1D_determinanteador,miBloque1D_determinanteador>>>(d_mat_A, d_arreglo_A, N);
 	cudaThreadSynchronize();
 	// printf("ERROR %s\n", cudaGetErrorString(cudaGetLastError()));
-	cudaMemcpy(arreglo_determinantes, d_arreglo_determinantes, numBytesDeterminantes, cudaMemcpyDeviceToHost);
-	print_CPU_array(arreglo_determinantes, N);
+	// cudaMemcpy(arreglo_determinantes, d_arreglo_determinantes, numBytesDeterminantes, cudaMemcpyDeviceToHost);
+	// print_CPU_array(arreglo_determinantes, N);
 
 
 
+	//################################ PROMEDIO ########################################
 
+	dim3 miBloque1D_sumador(threads_per_block,1);
+	for(int i=1; pow(threads_per_block, i-1) < N; i++)
+	{
+		int remaining_elements = ceil((float)N/pow(threads_per_block, i-1));
+		dim3 miGrid1D_sumador(remaining_elements,1);
+		sumador_determinantes<<<miGrid1D_sumador, miBloque1D_sumador>>>(d_arreglo_A, d_arreglo_B, remaining_elements);
+		cudaThreadSynchronize();
 
+		int* tmp = d_arreglo_A;
+		d_arreglo_A = d_arreglo_B;
+		d_arreglo_B = tmp;
+	}
+
+	printf("ERROR: %s\n", cudaGetErrorString(cudaGetLastError()));
+	cudaMemcpy(suma_det, d_arreglo_A, sizeof(int), cudaMemcpyDeviceToHost);
+	double promedio_det = (*suma_det) / N;
+	printf("PROMEDIO: %lf\n", promedio_det);
 
 
 
