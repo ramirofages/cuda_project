@@ -1,6 +1,6 @@
 #include "cuda.h"
 #include "stdio.h"
-#define threads_per_block 10
+#define threads_per_block 512
 
 
 
@@ -28,14 +28,16 @@ __global__ void sumador(int* arreglo, int* result, float N)
 	__shared__ int compartida[threads_per_block];
 
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
+	if(tid > N)
+		return;
+	
 	compartida[threadIdx.x] = arreglo[tid];
 	__syncthreads();
-	for(int i=1; pow((float)2,(float)i-1) < 10; i++)
+	for(int i=1; pow((float)2,(float)i-1) < threads_per_block; i++)
 	{
 		int acceso = pow((float)2,(float)i);
 		int offset = pow((float)2, (float)i-1);
-		if(threadIdx.x < (10.0/acceso) && (threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
+		if(threadIdx.x < ((float)threads_per_block/acceso) && (threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
 		{
 				compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
 				compartida[threadIdx.x * acceso + offset] = 0;
@@ -61,7 +63,7 @@ int* d_arreglo_suma2;
 
 int main(int argc, char** argv){
 
-	int N = 1220;
+	int N = 2048;
 	//##################################################################################
 	//############################## INICIALIZACION ####################################
 
