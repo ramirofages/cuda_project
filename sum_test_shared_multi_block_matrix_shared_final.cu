@@ -1,6 +1,6 @@
 #include "cuda.h"
 #include "stdio.h"
-#define threads_per_block 10
+#define threads_per_block 32
 
 
 
@@ -71,7 +71,7 @@ __global__ void sumador(int* arreglo, int* result, float N)
 		int new_access = t_id * acceso + threadIdx.x % 16 ;
 		int new_offset = new_access + offset * 16;
 
-		if(t_id < (160.0/acceso) && (new_offset  < (160)))
+		if(t_id < ((float)threads_per_block*16/acceso) && (new_offset  < (threads_per_block*16)))
 		{
 				
 
@@ -103,7 +103,7 @@ int* d_arreglo_suma2;
 
 int main(int argc, char** argv){
 
-	int N = 1210;
+	int N = 1100000;
 	//##################################################################################
 	//############################## INICIALIZACION ####################################
 	int byte_size = N * sizeof(int) * 16;
@@ -122,15 +122,6 @@ int main(int argc, char** argv){
 	//################################ EJECUCIONES #####################################
 
 
-	// dim3 miBloque1D_1(threads_per_block * 16,1);
-	// dim3 miGrid1D_1(2,1);
-	// sumador<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, N);
-
-	// dim3 miGrid1D_2(1,1);
-	// sumador<<<miGrid1D_2, miBloque1D_1>>>(d_arreglo_suma2, d_arreglo_suma1, 2);
-
-	// int block_count = ceil((float)(N) / (threads_per_block));
-	// printf("block count %d\n", block_count);
 	dim3 miBloque1D_1(threads_per_block *16,1);
 	for(int i=1; pow(threads_per_block, i-1) < N; i++)
 	{
@@ -140,13 +131,14 @@ int main(int argc, char** argv){
 		dim3 miGrid1D_1(remaining_elements,1);
 		sumador<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, remaining_elements);
 		cudaThreadSynchronize();
-
+		printf("ERROR %s\n", cudaGetErrorString(cudaGetLastError()));
 		int* tmp = d_arreglo_suma1;
 		d_arreglo_suma1 = d_arreglo_suma2;
 		d_arreglo_suma2 = tmp;
 
 		printf("elementos restantes: %d \n ", remaining_elements);
 		printf("block_count: %d \n ", block_count);
+		printf("\n ", "");
 
 
 	}
