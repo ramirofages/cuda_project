@@ -175,6 +175,83 @@ __global__ void determinanteador(int* arreglo_b, int* arreglo_a, int N){
 	
 }
 
+void determinanteador_CPU(int* arreglo_b, int* arreglo_a, int tid){
+
+
+	int mat[9];
+	mat[0] = arreglo_b[(tid * 16) + 5];
+	mat[1] = arreglo_b[(tid * 16) + 6];
+	mat[2] = arreglo_b[(tid * 16) + 7];
+	mat[3] = arreglo_b[(tid * 16) + 9];
+	mat[4] = arreglo_b[(tid * 16) + 10];
+	mat[5] = arreglo_b[(tid * 16) + 11];
+	mat[6] = arreglo_b[(tid * 16) + 13];
+	mat[7] = arreglo_b[(tid * 16) + 14];
+	mat[8] = arreglo_b[(tid * 16) + 15];
+	
+	float det0 = mat[0]*(mat[4]*mat[8] - mat[5]*mat[7]);
+	float det1 = mat[1]*(mat[3]*mat[8] - mat[5]*mat[6]);
+	float det2 = mat[2]*(mat[3]*mat[7] - mat[4]*mat[6]);
+	
+	float result0 = det0 - det1 + det2;
+	result0 *= arreglo_b[0];	
+
+	mat[0] = arreglo_b[(tid * 16) + 4];
+	mat[1] = arreglo_b[(tid * 16) + 6];
+	mat[2] = arreglo_b[(tid * 16) + 7];
+	mat[3] = arreglo_b[(tid * 16) + 8];
+	mat[4] = arreglo_b[(tid * 16) + 10];
+	mat[5] = arreglo_b[(tid * 16) + 11];
+	mat[6] = arreglo_b[(tid * 16) + 12];
+	mat[7] = arreglo_b[(tid * 16) + 14];
+	mat[8] = arreglo_b[(tid * 16) + 15];
+	
+	det0 = mat[0]*(mat[4]*mat[8] - mat[5]*mat[7]);
+	det1 = mat[1]*(mat[3]*mat[8] - mat[5]*mat[6]);
+	det2 = mat[2]*(mat[3]*mat[7] - mat[4]*mat[6]);
+	
+	float result1 = det0 - det1 + det2;
+	result1 *= arreglo_b[1];
+
+	mat[0] = arreglo_b[(tid * 16) + 4];
+	mat[1] = arreglo_b[(tid * 16) + 5];
+	mat[2] = arreglo_b[(tid * 16) + 7];
+	mat[3] = arreglo_b[(tid * 16) + 8];
+	mat[4] = arreglo_b[(tid * 16) + 9];
+	mat[5] = arreglo_b[(tid * 16) + 11];
+	mat[6] = arreglo_b[(tid * 16) + 12];
+	mat[7] = arreglo_b[(tid * 16) + 13];
+	mat[8] = arreglo_b[(tid * 16) + 15];
+	
+	det0 = mat[0]*(mat[4]*mat[8] - mat[5]*mat[7]);
+	det1 = mat[1]*(mat[3]*mat[8] - mat[5]*mat[6]);
+	det2 = mat[2]*(mat[3]*mat[7] - mat[4]*mat[6]);
+	
+	float result2 = det0 - det1 + det2;
+	result2 *= arreglo_b[2];
+
+	mat[0] = arreglo_b[(tid * 16) + 4];
+	mat[1] = arreglo_b[(tid * 16) + 5];
+	mat[2] = arreglo_b[(tid * 16) + 6];
+	mat[3] = arreglo_b[(tid * 16) + 8];
+	mat[4] = arreglo_b[(tid * 16) + 9];
+	mat[5] = arreglo_b[(tid * 16) + 10];
+	mat[6] = arreglo_b[(tid * 16) + 12];
+	mat[7] = arreglo_b[(tid * 16) + 13];
+	mat[8] = arreglo_b[(tid * 16) + 14];
+	
+	det0 = mat[0]*(mat[4]*mat[8] - mat[5]*mat[7]);
+	det1 = mat[1]*(mat[3]*mat[8] - mat[5]*mat[6]);
+	det2 = mat[2]*(mat[3]*mat[7] - mat[4]*mat[6]);
+	
+	float result3 = det0 - det1 + det2;
+	result3 *= arreglo_b[3];
+
+	float result_total = result0 - result1 + result2 - result3;
+	arreglo_a[tid] = result_total;
+	
+}
+
 // realiza la suma de determinantes
 __global__ void sumador_determinantes(int* arreglo, int* result, float N)
 {
@@ -245,7 +322,7 @@ __global__ void sumador_matrices(int* arreglo, int* result, float N)
 
 int main(int argc, char** argv){
 
-	int N = 256;
+	int N = 512*512 ;
 
 	int numBytesMatrices = sizeof(int) * N * 16; //bytes a alocar
 	int numBytesDeterminantes = sizeof(int) * N; //bytes a alocar
@@ -342,9 +419,81 @@ int main(int argc, char** argv){
 	for(int i=0; i< 16; i++)
 		mat_B[i] *= (int)promedio_det;
 
+	printf("%s\n", "");
+	printf("%s\n", "");
+	printf("%s\n", "");
 
-	printf("%s\n", "RESULTADO:");
+	printf("%s\n", "RESULTADO GPU:");
 	print_CPU_matrix(mat_B, 16);
+
+
+
+//        CCCCCCCCCCCCCPPPPPPPPPPPPPPPPP   UUUUUUUU     UUUUUUUU
+//     CCC::::::::::::CP::::::::::::::::P  U::::::U     U::::::U
+//   CC:::::::::::::::CP::::::PPPPPP:::::P U::::::U     U::::::U
+//  C:::::CCCCCCCC::::CPP:::::P     P:::::PUU:::::U     U:::::UU
+// C:::::C       CCCCCC  P::::P     P:::::P U:::::U     U:::::U 
+//C:::::C                P::::P     P:::::P U:::::D     D:::::U 
+//C:::::C                P::::PPPPPP:::::P  U:::::D     D:::::U 
+//C:::::C                P:::::::::::::PP   U:::::D     D:::::U 
+//C:::::C                P::::PPPPPPPPP     U:::::D     D:::::U 
+//C:::::C                P::::P             U:::::D     D:::::U 
+//C:::::C                P::::P             U:::::D     D:::::U 
+// C:::::C       CCCCCC  P::::P             U::::::U   U::::::U 
+//  C:::::CCCCCCCC::::CPP::::::PP           U:::::::UUU:::::::U 
+//   CC:::::::::::::::CP::::::::P            UU:::::::::::::UU  
+//     CCC::::::::::::CP::::::::P              UU:::::::::UU    
+//        CCCCCCCCCCCCCPPPPPPPPPP                UUUUUUUUU      
+
+
+	init_CPU_matrices_array(mat_A, N);
+	for(int i=0; i< 16; i++)
+	{
+		mat_B[i] = 0;	
+	}
+
+	for(int i=0; i< N; i++)
+	{
+		determinanteador_CPU(mat_A, arreglo_determinantes, i);
+	}
+	int suma_determinantes_cpu = 0;
+	for(int i=0; i< N; i++)
+	{
+		suma_determinantes_cpu += arreglo_determinantes[i];
+	}
+
+
+
+	// printf("%s\n", "");
+	// printf("%s\n", "");
+	// printf("%s\n", "");
+	// printf("%s\n", "DETERMINANTES CPU:");
+
+	// print_CPU_matrix(arreglo_determinantes, N);
+	// printf("%s\n", "");
+
+	// printf("%s\n", "SUMA TOTAL DETERMINANTES:");
+	// printf("%d\n", suma_determinantes_cpu);
+	float promedio = (float)suma_determinantes_cpu / N;
+
+
+	for(int j=0; j<16; j++)
+	{
+		for(int i=0; i< N; i++)
+		{
+			mat_B[j] += mat_A[i * 16 + j];
+		}
+		mat_B[j] *= promedio;
+	}
+
+	printf("%s\n", "");
+	printf("%s\n", "");
+	printf("%s\n", "");
+	printf("%s\n", "RESULTADO CPU:");
+
+	print_CPU_matrix(mat_B, 16);
+
+
 
 
 
@@ -367,5 +516,20 @@ int main(int argc, char** argv){
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
