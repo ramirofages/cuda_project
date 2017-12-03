@@ -1,6 +1,6 @@
 #include "cuda.h"
 #include "stdio.h"
-
+#include <time.h>
 #define threads_per_block 512
 #define threads_per_block_matrix 32 // 32*16 = 512
 
@@ -325,7 +325,7 @@ __global__ void sumador_matrices(int* arreglo, int* result, float N)
 
 int main(int argc, char** argv){
 
-	int N = 1024*1024 ;
+	int N = 4096*4096 ;
 
 	int numBytesMatrices = sizeof(int) * N * 16; //bytes a alocar
 	int numBytesDeterminantes = sizeof(int) * N; //bytes a alocar
@@ -358,6 +358,7 @@ int main(int argc, char** argv){
 	//##################################################################################
 	//################################ EJECUCIONES #####################################
 
+	clock_t time_gpu = clock();
 
 	//################################ DETERMINANTE ####################################
 	dim3 miGrid1D_determinanteador(ceil((float)N/threads_per_block),1);
@@ -405,8 +406,8 @@ int main(int argc, char** argv){
 		cudaThreadSynchronize();
 
 		// printf("ERROR %s\n", cudaGetErrorString(cudaGetLastError()));
-		printf("elementos restantes: %d \n", remaining_elements);
-		printf("bloques usados: %d \n", block_count);
+		// printf("elementos restantes: %d \n", remaining_elements);
+		// printf("bloques usados: %d \n", block_count);
 		int* tmp = d_mat_A;
 		d_mat_A = d_mat_B;
 		d_mat_B = tmp;
@@ -415,24 +416,23 @@ int main(int argc, char** argv){
 
 	//############################### READ BACK ########################################
 
+	clock_t time_gpu_end = clock();
 	// PROMEDIO
 	cudaMemcpy(suma_det, d_arreglo_A, sizeof(int), cudaMemcpyDeviceToHost);
 	// printf("SUMA DE DETERMINANTES: %d\n", *suma_det);
 	double promedio_det = (float)(*suma_det) / N;
-	printf("PROMEDIO: %lf\n", promedio_det);
+	// printf("PROMEDIO: %lf\n", promedio_det);
 	
 	// SUMA DE MATRICES
-	cudaMemcpy(mat_B, d_mat_A, 16 * sizeof(int) * N, cudaMemcpyDeviceToHost);
+	cudaMemcpy(mat_B, d_mat_A, 16 * sizeof(int), cudaMemcpyDeviceToHost);
 
 
-	// for(int i=0; i< 16; i++)
-	// 	mat_B[i] *= (int)promedio_det;
+	for(int i=0; i< 16; i++)
+		mat_B[i] *= (int)promedio_det;
 
 	printf("%s\n", "");
-	printf("%s\n", "");
-	printf("%s\n", "");
 
-	printf("%s\n", "RESULTADO GPU:");
+	printf("%s", "RESULTADO GPU:");
 	print_CPU_matrix(mat_B, 16);
 
 
@@ -461,6 +461,7 @@ int main(int argc, char** argv){
 		mat_B[i] = 0;	
 	}
 
+	clock_t time_cpu = clock();
 	for(int i=0; i< N; i++)
 	{
 		determinanteador_CPU(mat_A, arreglo_determinantes, i);
@@ -483,7 +484,7 @@ int main(int argc, char** argv){
 
 	// printf("%s\n", "SUMA TOTAL DETERMINANTES:");
 	// printf("%d\n", suma_determinantes_cpu);
-	// float promedio = (float)suma_determinantes_cpu / N;
+	float promedio = (float)suma_determinantes_cpu / N;
 
 
 	for(int j=0; j<16; j++)
@@ -492,17 +493,25 @@ int main(int argc, char** argv){
 		{
 			mat_B[j] += mat_A[i * 16 + j];
 		}
-		// mat_B[j] *= promedio;
+		mat_B[j] *= promedio;
 	}
+	clock_t time_cpu_end = clock();
+
 
 	printf("%s\n", "");
 	printf("%s\n", "");
 	printf("%s\n", "");
-	printf("%s\n", "RESULTADO CPU:");
+	printf("%s", "RESULTADO CPU:");
 
 	print_CPU_matrix(mat_B, 16);
 
 
+	printf("%s\n", "");
+	printf("%s\n", "");
+	printf("%s\n", "");
+
+	printf("TIEMPO CPU: %lf\n", (double)(time_cpu_end - time_cpu) / CLOCKS_PER_SEC);
+	printf("TIEMPO GPU: %lf\n", (double)(time_gpu_end - time_gpu) / CLOCKS_PER_SEC);
 
 
 
