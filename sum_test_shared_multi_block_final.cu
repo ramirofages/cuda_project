@@ -29,25 +29,31 @@ __global__ void sumador(int* arreglo, int* result, float N)
 
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 	if(tid > N)
-		return;
-	
-	compartida[threadIdx.x] = arreglo[tid];
-	__syncthreads();
-	for(int i=1; pow((float)2,(float)i-1) < threads_per_block; i++)
 	{
-		int acceso = pow((float)2,(float)i);
-		int offset = pow((float)2, (float)i-1);
-		if(threadIdx.x < ((float)threads_per_block/acceso) && (threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
-		{
-				compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
-				compartida[threadIdx.x * acceso + offset] = 0;
-		}
-
+		return;
 	}
 
-	//el primer thread de cada grupo guarda el resultado
-	if(threadIdx.x == 0)
-		result[blockIdx.x] = compartida[0];
+	compartida[threadIdx.x] = arreglo[tid];
+		__syncthreads();
+		for(int i=1; pow((float)2,(float)i-1) < threads_per_block; i++)
+		{
+			int acceso = pow((float)2,(float)i);
+			int offset = pow((float)2, (float)i-1);
+			if(threadIdx.x < ((float)threads_per_block/acceso) && (threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
+			{
+					compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
+					// compartida[threadIdx.x * acceso + offset] = 0;
+			}
+			__syncthreads();
+
+		}
+
+		//el primer thread de cada grupo guarda el resultado
+
+		if(threadIdx.x == 0)
+			result[blockIdx.x] = compartida[0];
+	
+
 
 }
 
@@ -63,7 +69,7 @@ int* d_arreglo_suma2;
 
 int main(int argc, char** argv){
 
-	int N = 2048;
+	int N = 1024000;
 	//##################################################################################
 	//############################## INICIALIZACION ####################################
 
@@ -78,16 +84,17 @@ int main(int argc, char** argv){
 	cudaMemcpy(d_arreglo_suma1, arreglo_suma1, N * sizeof(int), cudaMemcpyHostToDevice);
 
 	// int threads_per_block = 10;
-	int block_count = ceil((float)N / threads_per_block);
+	// int block_count = ceil((float)N / threads_per_block);
 
 	//##################################################################################
 	//################################ EJECUCIONES #####################################
 
 	dim3 miBloque1D_1(threads_per_block,1);
-	for(int i=1; pow(threads_per_block, i-1) < N; i++)
+	for(int i=0; pow(threads_per_block, i) < N ; i++)
 	{
-		int remaining_elements = ceil((float)N/pow(threads_per_block, i-1));
-		dim3 miGrid1D_1(remaining_elements,1);
+		int remaining_elements = ceil((float)N/pow(threads_per_block, i));
+		int block_count = ceil((float)N/pow(threads_per_block, i+1));
+		dim3 miGrid1D_1(block_count,1);
 		sumador<<<miGrid1D_1, miBloque1D_1>>>(d_arreglo_suma1, d_arreglo_suma2, remaining_elements);
 		cudaThreadSynchronize();
 
@@ -95,7 +102,8 @@ int main(int argc, char** argv){
 		d_arreglo_suma1 = d_arreglo_suma2;
 		d_arreglo_suma2 = tmp;
 
-		printf("elementos restantes: %d \n ", remaining_elements);
+		printf("elementos restantes: %d \n", remaining_elements);
+		printf("bloques usados:      %d \n\n", block_count);
 
 
 	}

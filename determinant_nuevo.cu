@@ -270,8 +270,10 @@ __global__ void sumador_determinantes(int* arreglo, int* result, float N)
 		if(threadIdx.x < ((float)threads_per_block/acceso) && (threadIdx.x * acceso + offset) < (N - blockIdx.x * blockDim.x))
 		{
 				compartida[threadIdx.x * acceso] = compartida[threadIdx.x * acceso] + compartida[threadIdx.x * acceso + offset];
-				compartida[threadIdx.x * acceso + offset] = 0;
+				// compartida[threadIdx.x * acceso + offset] = 0;
 		}
+		__syncthreads();
+
 
 	}
 
@@ -306,10 +308,11 @@ __global__ void sumador_matrices(int* arreglo, int* result, float N)
 				
 
 				compartida[new_access] = compartida[new_access] + compartida[new_offset];
-				compartida[new_offset] = 0;
+				// compartida[new_offset] = 0;
 				// printf("GRUPO: %d - ITERACION: %d - TID %d - ACCESO: %d - OFFSET %d - REMAINING: %d \n", blockIdx.x,
 				// 														i, 			tid, 	new_access , new_offset, threadIdx.x * acceso + offset);
 		}
+		__syncthreads();
 
 
 	}
@@ -322,7 +325,7 @@ __global__ void sumador_matrices(int* arreglo, int* result, float N)
 
 int main(int argc, char** argv){
 
-	int N = 512*512 ;
+	int N = 1024*1024 ;
 
 	int numBytesMatrices = sizeof(int) * N * 16; //bytes a alocar
 	int numBytesDeterminantes = sizeof(int) * N; //bytes a alocar
@@ -361,7 +364,7 @@ int main(int argc, char** argv){
 	dim3 miBloque1D_determinanteador(threads_per_block,1);
 
 	determinanteador<<<miGrid1D_determinanteador,miBloque1D_determinanteador>>>(d_mat_A, d_arreglo_A, N);
-	cudaThreadSynchronize();
+	// cudaThreadSynchronize();
 	// printf("ERROR %s\n", cudaGetErrorString(cudaGetLastError()));
 	// cudaMemcpy(arreglo_determinantes, d_arreglo_A, numBytesDeterminantes, cudaMemcpyDeviceToHost);
 	// print_CPU_matrix(arreglo_determinantes, N);
@@ -371,14 +374,16 @@ int main(int argc, char** argv){
 	//############################# SUMADOR DETERMINANTE ###############################
 
 	dim3 miBloque1D_sumador(threads_per_block,1);
-	for(int i=1; pow(threads_per_block, i-1) < N; i++)
+	for(int i=0; pow(threads_per_block, i) < N ; i++)
 	{
-		int remaining_elements = ceil((float)N/pow(threads_per_block, i-1));
-		dim3 miGrid1D_sumador(remaining_elements,1);
+		int remaining_elements = ceil((float)N/pow(threads_per_block, i));
+		int block_count = ceil((float)N/pow(threads_per_block, i+1));
+		dim3 miGrid1D_sumador(block_count,1);
 		sumador_determinantes<<<miGrid1D_sumador, miBloque1D_sumador>>>(d_arreglo_A, d_arreglo_B, remaining_elements);
 		cudaThreadSynchronize();
 		// printf("ERROR: %s\n", cudaGetErrorString(cudaGetLastError()));
-
+		// printf("elementos restantes: %d \n", remaining_elements);
+		// printf("bloques usados: %d \n", block_count);
 		int* tmp = d_arreglo_A;
 		d_arreglo_A = d_arreglo_B;
 		d_arreglo_B = tmp;
@@ -389,16 +394,19 @@ int main(int argc, char** argv){
 
 	//############################## SUMADOR MATRICES ##################################
 
-	dim3 miBloque1D_sumador_mat(threads_per_block_matrix *16,1);
-	for(int i=1; pow(threads_per_block_matrix, i-1) < N; i++)
+	dim3 miBloque1D_sumador_mat(threads_per_block,1);
+	for(int i=0; pow(threads_per_block_matrix, i) < N ; i++)
 	{
-		int remaining_elements = ceil((float)N/pow(threads_per_block_matrix, i-1));
-		int block_count = ceil((float)N/pow(threads_per_block_matrix * 16, i-1));
+		int remaining_elements = ceil((float)N/pow(threads_per_block_matrix, i));
+		int block_count = ceil((float)N/pow(threads_per_block_matrix, i+1));
 
-		dim3 miGrid1D_sumador_mat(remaining_elements,1);
+		dim3 miGrid1D_sumador_mat(block_count,1);
 		sumador_matrices<<<miGrid1D_sumador_mat, miBloque1D_sumador_mat>>>(d_mat_A, d_mat_B, remaining_elements);
 		cudaThreadSynchronize();
+
 		// printf("ERROR %s\n", cudaGetErrorString(cudaGetLastError()));
+		printf("elementos restantes: %d \n", remaining_elements);
+		printf("bloques usados: %d \n", block_count);
 		int* tmp = d_mat_A;
 		d_mat_A = d_mat_B;
 		d_mat_B = tmp;
@@ -409,15 +417,16 @@ int main(int argc, char** argv){
 
 	// PROMEDIO
 	cudaMemcpy(suma_det, d_arreglo_A, sizeof(int), cudaMemcpyDeviceToHost);
+	// printf("SUMA DE DETERMINANTES: %d\n", *suma_det);
 	double promedio_det = (float)(*suma_det) / N;
 	printf("PROMEDIO: %lf\n", promedio_det);
 	
 	// SUMA DE MATRICES
-	cudaMemcpy(mat_B, d_mat_A, 16 * sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(mat_B, d_mat_A, 16 * sizeof(int) * N, cudaMemcpyDeviceToHost);
 
 
-	for(int i=0; i< 16; i++)
-		mat_B[i] *= (int)promedio_det;
+	// for(int i=0; i< 16; i++)
+	// 	mat_B[i] *= (int)promedio_det;
 
 	printf("%s\n", "");
 	printf("%s\n", "");
@@ -474,7 +483,7 @@ int main(int argc, char** argv){
 
 	// printf("%s\n", "SUMA TOTAL DETERMINANTES:");
 	// printf("%d\n", suma_determinantes_cpu);
-	float promedio = (float)suma_determinantes_cpu / N;
+	// float promedio = (float)suma_determinantes_cpu / N;
 
 
 	for(int j=0; j<16; j++)
@@ -483,7 +492,7 @@ int main(int argc, char** argv){
 		{
 			mat_B[j] += mat_A[i * 16 + j];
 		}
-		mat_B[j] *= promedio;
+		// mat_B[j] *= promedio;
 	}
 
 	printf("%s\n", "");
